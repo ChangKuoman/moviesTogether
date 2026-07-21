@@ -17,7 +17,6 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$REPO_DIR/backend"
-SERVICE_USER="moviestogether"
 CORS_ORIGIN="${1:-http://localhost:5173}"
 
 if [ "$EUID" -ne 0 ]; then
@@ -25,17 +24,32 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# If the repo lives under a real login user's home directory (the common case - you cloned it
+# into your own account), run the service as that same user instead of a separate system
+# account. A dedicated 'moviestogether' account can't be chown'd into working order there: home
+# directories are typically mode 750/700, so no amount of chown-ing the repo itself lets a
+# DIFFERENT account even traverse into ~/, regardless of the repo's own ownership. Only fall back
+# to a dedicated system account when the repo is somewhere shared (e.g. /opt), where that
+# isolation is actually meaningful.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ] && [[ "$REPO_DIR" == "/home/$SUDO_USER"* ]]; then
+  SERVICE_USER="$SUDO_USER"
+  echo "==> Repo is under $SUDO_USER's home directory - running the service as $SUDO_USER"
+else
+  SERVICE_USER="moviestogether"
+  echo "==> Ensuring dedicated service user '$SERVICE_USER' exists"
+  id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+fi
+
+# Always (re-)apply ownership, even in the home-directory case - a previous run of an older
+# version of this script may have already chown'd everything to a stale/different user.
+echo "==> Ensuring $REPO_DIR is owned by $SERVICE_USER"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$REPO_DIR"
+
 echo "==> Using repo at $REPO_DIR"
 
 echo "==> Installing system packages (python3-venv, caddy) if missing"
 apt-get update -qq
 apt-get install -y -qq python3-venv caddy
-
-echo "==> Ensuring service user '$SERVICE_USER' exists"
-id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
-
-echo "==> Setting ownership of $REPO_DIR to $SERVICE_USER"
-chown -R "$SERVICE_USER:$SERVICE_USER" "$REPO_DIR"
 
 echo "==> Creating/updating the Python virtualenv"
 sudo -u "$SERVICE_USER" python3 -m venv "$BACKEND_DIR/.venv"
