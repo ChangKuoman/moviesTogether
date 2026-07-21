@@ -1,12 +1,28 @@
 # Deploying MoviesTogether
 
 Frontend on **Vercel** (free), backend + SQLite on your own **Google Compute Engine VM** (or any
-Linux box — nothing here is GCE-specific except the firewall step). Vercel proxies `/api/*` to
-your VM, so the browser only ever talks to your Vercel domain — no CORS to configure, and the VM
-doesn't need a browser-trusted HTTPS certificate to get started.
+Linux box — nothing here is GCE-specific except the firewall step). Both sides deploy from the
+same **GitHub repo**: Vercel redeploys the frontend automatically on every push, and the VM pulls
+the backend from GitHub too so "deploy an update" is just `git pull` + a service restart. Vercel
+proxies `/api/*` to your VM, so the browser only ever talks to your Vercel domain — no CORS to
+configure, and the VM doesn't need a browser-trusted HTTPS certificate to get started.
 
 Everything below is free (beyond the VM you already have). The one optional paid step (a domain
 name, ~$10-15/year) is called out explicitly at the end and can be skipped entirely.
+
+## 0. Push this repo to GitHub
+
+The repo is already git-initialized locally (`git log` shows the initial commit). To put it on GitHub:
+
+1. Create a new repo on GitHub (github.com/new) — **private** is recommended, since this is just for you and a friend. Don't initialize it with a README/gitignore (this repo already has them).
+2. Add it as a remote and push:
+   ```bash
+   cd /path/to/moviestogether
+   git remote add origin https://github.com/<your-username>/<your-repo-name>.git
+   git branch -M main
+   git push -u origin main
+   ```
+3. From now on, every change you want live goes: commit → `git push` → Vercel redeploys the frontend automatically; the backend needs one `git pull` on the VM (see §7).
 
 ## 1. Rotate secrets
 
@@ -23,21 +39,24 @@ password from anywhere else.
 
 ## 2. Set up the VM (backend)
 
-SSH into your GCE VM, then:
+SSH into your GCE VM, then clone the GitHub repo from §0 directly (replace the URL):
 
 ```bash
 sudo apt update && sudo apt install -y python3-venv git caddy
 
 sudo useradd --system --create-home --home-dir /opt/moviestogether moviestogether
-sudo -u moviestogether git clone <your-repo-url> /opt/moviestogether-src
-sudo mkdir -p /opt/moviestogether/backend
-sudo cp -r /opt/moviestogether-src/backend/* /opt/moviestogether/backend/
-sudo chown -R moviestogether:moviestogether /opt/moviestogether
+sudo -u moviestogether git clone https://github.com/<your-username>/<your-repo-name>.git /opt/moviestogether
 
 cd /opt/moviestogether/backend
 sudo -u moviestogether python3 -m venv .venv
 sudo -u moviestogether ./.venv/bin/pip install -r requirements.txt
 ```
+
+If the repo is **private**, cloning over plain `https://` will prompt for credentials that don't
+work well non-interactively. Easiest fix: create a fine-grained GitHub Personal Access Token
+(read-only, scoped to just this repo) and clone with
+`https://<token>@github.com/<your-username>/<your-repo-name>.git` instead — or set up a deploy key
+over SSH if you prefer. Either way, the token/key only needs read access.
 
 Create `/opt/moviestogether/backend/.env` (as root or the `moviestogether` user) with the rotated
 secrets from step 1:
@@ -54,7 +73,11 @@ SITE_TOKEN_EXPIRE_MINUTES=43200
 ```
 
 (`CORS_ORIGINS` isn't security-critical here since the browser never calls this box directly — see
-§4 — but set it to your real Vercel URL once you have it, for defense in depth.)
+§5 — but set it to your real Vercel URL once you have it, for defense in depth.)
+
+```bash
+sudo chown -R moviestogether:moviestogether /opt/moviestogether
+```
 
 Install the systemd service (template at `deploy/moviestogether-backend.service` in this repo):
 
@@ -95,18 +118,17 @@ curl http://<vm-static-ip>:8001/api/health  # should time out / connection refus
 
 ## 4. Deploy the frontend to Vercel
 
-1. Push this repo to GitHub (if it isn't already).
-2. In Vercel: **New Project** → import the repo → set **Root Directory** to `frontend`. Framework preset "Vite" should be auto-detected.
-3. Edit `frontend/vercel.json` (already in the repo) and replace `YOUR_GCE_STATIC_IP` with your actual static IP from step 3, then commit/push:
+1. In Vercel: **New Project** → **Import Git Repository** → pick the GitHub repo from §0 → set **Root Directory** to `frontend`. Framework preset "Vite" should be auto-detected. (First time connecting Vercel to GitHub, it'll ask to install the Vercel GitHub App and grant it access to the repo — scope that to just this one repo, not all your repos.)
+2. Edit `frontend/vercel.json` (already in the repo) and replace `YOUR_GCE_STATIC_IP` with your actual static IP from step 3, then commit/push:
    ```json
    { "rewrites": [{ "source": "/api/:path*", "destination": "http://<vm-static-ip>/api/:path*" }] }
    ```
-4. In the Vercel project's **Environment Variables**, add:
+3. In the Vercel project's **Environment Variables**, add:
    ```
    VITE_API_BASE_URL=/api
    ```
    (A relative path — because of the rewrite, the API is same-origin as far as the browser is concerned.)
-5. Trigger a deploy (push to the connected branch, or click Deploy in the dashboard).
+4. Push to `main` → Vercel builds and deploys automatically. Every future push redeploys automatically too — no manual step on the Vercel side ever again.
 
 ## 5. Verify end-to-end
 
@@ -131,6 +153,18 @@ mkdir -p /opt/moviestogether/backups
 
 (Off-VM backups via a GCS bucket are a fine upgrade later — costs a few cents/month for a file this
 small — but aren't required.)
+
+## 7. Redeploying after future changes
+
+- **Frontend**: nothing to do — `git push` to `main` and Vercel redeploys automatically.
+- **Backend**: SSH into the VM and:
+  ```bash
+  cd /opt/moviestogether
+  sudo -u moviestogether git pull
+  sudo -u moviestogether /opt/moviestogether/backend/.venv/bin/pip install -r backend/requirements.txt
+  sudo systemctl restart moviestogether-backend
+  ```
+  (The `pip install` is a no-op if `requirements.txt` didn't change, so it's safe to always run.)
 
 ## Optional: a real domain (~$10-15/year, skip if you don't want to spend anything)
 
