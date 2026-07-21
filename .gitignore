@@ -1,0 +1,6 @@
+# Claude Code local session state - not project config, don't share
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db

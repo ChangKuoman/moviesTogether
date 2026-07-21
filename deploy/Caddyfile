@@ -1,0 +1,16 @@
+# Reverse proxy for the backend on the GCE VM. Only proxies /api - the frontend is on Vercel.
+#
+# This box is only ever reached by Vercel's server-side rewrite (see frontend/vercel.json), never
+# directly by a browser, so plain HTTP is acceptable here to start. Once you have a domain, swap
+# the block below for the commented-out version to get a real Let's Encrypt cert automatically.
+
+:80 {
+	reverse_proxy 127.0.0.1:8001
+}
+
+# Domain version (uncomment and edit once you have a domain pointed at this VM's static IP,
+# then also update frontend/vercel.json's destination to https://your-api-domain.com/api/:path*):
+#
+# your-api-domain.com {
+# 	reverse_proxy 127.0.0.1:8001
+# }

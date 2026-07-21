@@ -1,0 +1,22 @@
+[Unit]
+Description=MoviesTogether backend (FastAPI/uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=moviestogether
+Group=moviestogether
+WorkingDirectory=/opt/moviestogether/backend
+EnvironmentFile=/opt/moviestogether/backend/.env
+ExecStart=/opt/moviestogether/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
+Restart=always
+RestartSec=3
+
+# Basic sandboxing - the service only needs to read/write its own directory (for the sqlite file)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/moviestogether/backend
+
+[Install]
+WantedBy=multi-user.target
