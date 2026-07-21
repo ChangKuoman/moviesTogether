@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=moviestogether
-Group=moviestogether
-WorkingDirectory=/opt/moviestogether/backend
-EnvironmentFile=/opt/moviestogether/backend/.env
-ExecStart=/opt/moviestogether/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
+User=__SERVICE_USER__
+Group=__SERVICE_USER__
+WorkingDirectory=__BACKEND_DIR__
+EnvironmentFile=__BACKEND_DIR__/.env
+ExecStart=__BACKEND_DIR__/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
 Restart=always
 RestartSec=3
 
@@ -16,7 +16,7 @@ RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/opt/moviestogether/backend
+ReadWritePaths=__BACKEND_DIR__
 
 [Install]
 WantedBy=multi-user.target

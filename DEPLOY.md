@@ -19,8 +19,8 @@ hex), create `backend/.env` yourself before running the script; it leaves an exi
 
 ## 2. Set up the VM (backend)
 
-SSH into your GCE VM and clone your GitHub repo to `/opt/moviestogether` (the setup script in the
-next step assumes this exact path):
+SSH into your GCE VM and clone your GitHub repo — any path is fine, the setup script in the next
+step detects its own location and adapts (`/opt/moviestogether` below is just a suggestion):
 
 ```bash
 sudo apt update && sudo apt install -y git
@@ -35,10 +35,11 @@ key if you prefer.
 
 Then run the setup script (`deploy/setup-backend.sh`, already in the repo) — it installs
 `python3-venv`/Caddy if missing, creates the dedicated `moviestogether` service user, builds the
-venv, installs the systemd service + Caddy config, and starts everything:
+venv, generates a systemd unit for wherever you cloned it, installs the Caddy config, and starts
+everything:
 
 ```bash
-cd /opt/moviestogether
+cd /opt/moviestogether   # or wherever you cloned it
 sudo bash deploy/setup-backend.sh https://your-vercel-app.vercel.app
 ```
 
@@ -102,7 +103,8 @@ sudo apt install -y unattended-upgrades   # automatic OS security patches
 sudo apt install -y fail2ban              # blocks repeated failed SSH attempts
 ```
 
-**Backups** — a simple daily cron copying the SQLite file to a second directory on the same VM:
+**Backups** — a simple daily cron copying the SQLite file to a second directory on the same VM
+(adjust `/opt/moviestogether` below if you cloned to a different path):
 
 ```bash
 (crontab -l 2>/dev/null; echo "0 3 * * * cp /opt/moviestogether/backend/moviestogether.db /opt/moviestogether/backups/moviestogether-\$(date +%F).db") | crontab -

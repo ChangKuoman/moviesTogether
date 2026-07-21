@@ -4,8 +4,11 @@
 # .env with fresh secrets only if one doesn't already exist, reinstalls the systemd service and
 # Caddy config, then restarts everything).
 #
-# Usage: run from anywhere, as root, after the repo has been cloned to /opt/moviestogether:
-#   cd /opt/moviestogether && sudo bash deploy/setup-backend.sh
+# Works no matter where you cloned the repo - it detects its own location and generates the
+# systemd unit from a template rather than assuming a fixed path.
+#
+# Usage: run from anywhere, as root, after cloning the repo:
+#   cd /path/to/moviestogether && sudo bash deploy/setup-backend.sh
 #
 # Optional: pass your Vercel origin to set CORS_ORIGINS correctly on first run:
 #   sudo bash deploy/setup-backend.sh https://your-app.vercel.app
@@ -22,10 +25,7 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-if [ "$REPO_DIR" != "/opt/moviestogether" ]; then
-  echo "Warning: expected the repo at /opt/moviestogether (per DEPLOY.md), found it at $REPO_DIR." >&2
-  echo "The systemd unit template hardcodes /opt/moviestogether - edit deploy/moviestogether-backend.service if your path differs." >&2
-fi
+echo "==> Using repo at $REPO_DIR"
 
 echo "==> Installing system packages (python3-venv, caddy) if missing"
 apt-get update -qq
@@ -66,8 +66,11 @@ else
   echo "==> Found existing .env, leaving it untouched"
 fi
 
-echo "==> Installing systemd service"
-cp "$REPO_DIR/deploy/moviestogether-backend.service" /etc/systemd/system/
+echo "==> Generating and installing systemd service for this path"
+sed \
+  -e "s|__BACKEND_DIR__|$BACKEND_DIR|g" \
+  -e "s|__SERVICE_USER__|$SERVICE_USER|g" \
+  "$REPO_DIR/deploy/moviestogether-backend.service.template" > /etc/systemd/system/moviestogether-backend.service
 systemctl daemon-reload
 systemctl enable moviestogether-backend >/dev/null
 
