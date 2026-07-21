@@ -1,5 +1,7 @@
 # Deploying MoviesTogether
 
+Assumes this repo is already pushed to GitHub — both the VM and Vercel deploy straight from it.
+
 Frontend on **Vercel** (free), backend + SQLite on your own **Google Compute Engine VM** (or any
 Linux box — nothing here is GCE-specific except the firewall step). Vercel proxies `/api/*` to
 your VM, so the browser only ever talks to your Vercel domain — no CORS to configure, and the VM
@@ -23,21 +25,24 @@ password from anywhere else.
 
 ## 2. Set up the VM (backend)
 
-SSH into your GCE VM, then:
+SSH into your GCE VM, then clone your GitHub repo directly (replace the URL with yours):
 
 ```bash
 sudo apt update && sudo apt install -y python3-venv git caddy
 
 sudo useradd --system --create-home --home-dir /opt/moviestogether moviestogether
-sudo -u moviestogether git clone <your-repo-url> /opt/moviestogether-src
-sudo mkdir -p /opt/moviestogether/backend
-sudo cp -r /opt/moviestogether-src/backend/* /opt/moviestogether/backend/
-sudo chown -R moviestogether:moviestogether /opt/moviestogether
+sudo -u moviestogether git clone https://github.com/<your-username>/<your-repo-name>.git /opt/moviestogether
 
 cd /opt/moviestogether/backend
 sudo -u moviestogether python3 -m venv .venv
 sudo -u moviestogether ./.venv/bin/pip install -r requirements.txt
 ```
+
+If the repo is **private**, plain `https://` cloning will prompt for credentials that don't work
+well non-interactively — use a fine-grained GitHub Personal Access Token (read-only, scoped to
+just this repo) in the URL instead:
+`https://<token>@github.com/<your-username>/<your-repo-name>.git`, or set up a read-only SSH deploy
+key if you prefer.
 
 Create `/opt/moviestogether/backend/.env` (as root or the `moviestogether` user) with the rotated
 secrets from step 1:
@@ -95,18 +100,17 @@ curl http://<vm-static-ip>:8001/api/health  # should time out / connection refus
 
 ## 4. Deploy the frontend to Vercel
 
-1. Push this repo to GitHub (if it isn't already).
-2. In Vercel: **New Project** → import the repo → set **Root Directory** to `frontend`. Framework preset "Vite" should be auto-detected.
-3. Edit `frontend/vercel.json` (already in the repo) and replace `YOUR_GCE_STATIC_IP` with your actual static IP from step 3, then commit/push:
+1. In Vercel: **New Project** → **Import Git Repository** → pick your GitHub repo → set **Root Directory** to `frontend`. Framework preset "Vite" should be auto-detected. (First time connecting Vercel to this repo, it'll ask to install the Vercel GitHub App — scope that to just this repo.)
+2. Edit `frontend/vercel.json` (already in the repo) and replace `YOUR_GCE_STATIC_IP` with your actual static IP from step 3, then commit/push:
    ```json
    { "rewrites": [{ "source": "/api/:path*", "destination": "http://<vm-static-ip>/api/:path*" }] }
    ```
-4. In the Vercel project's **Environment Variables**, add:
+3. In the Vercel project's **Environment Variables**, add:
    ```
    VITE_API_BASE_URL=/api
    ```
    (A relative path — because of the rewrite, the API is same-origin as far as the browser is concerned.)
-5. Trigger a deploy (push to the connected branch, or click Deploy in the dashboard).
+4. Push to the connected branch → Vercel builds and deploys automatically; every future push redeploys too.
 
 ## 5. Verify end-to-end
 
