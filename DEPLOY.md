@@ -10,79 +10,55 @@ doesn't need a browser-trusted HTTPS certificate to get started.
 Everything below is free (beyond the VM you already have). The one optional paid step (a domain
 name, ~$10-15/year) is called out explicitly at the end and can be skipped entirely.
 
-## 1. Rotate secrets
+## 1. Secrets
 
-Never reuse the values from your local `backend/.env` in production. Generate fresh ones:
-
-```bash
-openssl rand -hex 32   # use the output as JWT_SECRET
-openssl rand -hex 32   # use a *different* output as SITE_PASSPHRASE, or pick a memorable phrase
-```
-
-`SITE_PASSPHRASE` is the one you and your friend will actually type into the app, so a memorable
-phrase (not necessarily random hex) is fine for that one specifically — just don't reuse a
-password from anywhere else.
+Never reuse the values from your local `backend/.env` in production. You don't need to generate
+anything by hand — the setup script in §2 creates fresh, random secrets automatically the first
+time it runs. If you'd rather pick your own (e.g. a memorable `SITE_PASSPHRASE` instead of random
+hex), create `backend/.env` yourself before running the script; it leaves an existing file alone.
 
 ## 2. Set up the VM (backend)
 
-SSH into your GCE VM, then clone your GitHub repo directly (replace the URL with yours):
+SSH into your GCE VM and clone your GitHub repo to `/opt/moviestogether` (the setup script in the
+next step assumes this exact path):
 
 ```bash
-sudo apt update && sudo apt install -y python3-venv git caddy
-
-sudo useradd --system --create-home --home-dir /opt/moviestogether moviestogether
-sudo -u moviestogether git clone https://github.com/<your-username>/<your-repo-name>.git /opt/moviestogether
-
-cd /opt/moviestogether/backend
-sudo -u moviestogether python3 -m venv .venv
-sudo -u moviestogether ./.venv/bin/pip install -r requirements.txt
+sudo apt update && sudo apt install -y git
+sudo git clone https://github.com/ChangKuoman/moviesTogether.git /opt/moviestogether
 ```
 
 If the repo is **private**, plain `https://` cloning will prompt for credentials that don't work
 well non-interactively — use a fine-grained GitHub Personal Access Token (read-only, scoped to
 just this repo) in the URL instead:
-`https://<token>@github.com/<your-username>/<your-repo-name>.git`, or set up a read-only SSH deploy
+`https://<token>@github.com/ChangKuoman/moviesTogether.git`, or set up a read-only SSH deploy
 key if you prefer.
 
-Create `/opt/moviestogether/backend/.env` (as root or the `moviestogether` user) with the rotated
-secrets from step 1:
-
-```
-DATABASE_URL=sqlite:///./moviestogether.db
-JWT_SECRET=<paste from step 1>
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=10080
-CORS_ORIGINS=https://your-vercel-app.vercel.app
-TMDB_API_KEY=
-SITE_PASSPHRASE=<paste from step 1>
-SITE_TOKEN_EXPIRE_MINUTES=43200
-```
-
-(`CORS_ORIGINS` isn't security-critical here since the browser never calls this box directly — see
-§4 — but set it to your real Vercel URL once you have it, for defense in depth.)
-
-Install the systemd service (template at `deploy/moviestogether-backend.service` in this repo):
+Then run the setup script (`deploy/setup-backend.sh`, already in the repo) — it installs
+`python3-venv`/Caddy if missing, creates the dedicated `moviestogether` service user, builds the
+venv, installs the systemd service + Caddy config, and starts everything:
 
 ```bash
-sudo cp deploy/moviestogether-backend.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now moviestogether-backend
-sudo systemctl status moviestogether-backend   # should show "active (running)"
+cd /opt/moviestogether
+sudo bash deploy/setup-backend.sh https://your-vercel-app.vercel.app
 ```
 
-Install Caddy's config (template at `deploy/Caddyfile`):
+(The URL argument is optional — it just pre-fills `CORS_ORIGINS`; you can edit `backend/.env`
+later if you don't have your Vercel URL yet.)
 
-```bash
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+**The first time you run it**, since no `backend/.env` exists yet, the script generates one with a
+fresh `JWT_SECRET` and `SITE_PASSPHRASE` automatically (no need to do the `openssl rand` step from
+§1 by hand) and **prints the generated passphrase at the end — write it down**, you and your friend
+need it to get past the gate. Re-running the script later (e.g. after `git pull` for an update)
+leaves an existing `.env` untouched and just reinstalls/restarts everything else.
+
+The script ends with a smoke test. You should see:
+
+```
+{"status":"ok"} -> backend OK
 ```
 
-**Verify from the VM itself**, before opening any firewall:
-
-```bash
-curl http://127.0.0.1/api/health          # -> {"status":"ok"}
-curl http://127.0.0.1/api/items           # -> 401 "Site access required" (correct - gate is working)
-```
+If instead you get "backend NOT responding," it prints the exact `journalctl` command to run for
+details.
 
 ## 3. GCP firewall + static IP
 
