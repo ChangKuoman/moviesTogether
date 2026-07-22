@@ -11,7 +11,7 @@ import { usePagination } from '../composables/usePagination'
 const itemsStore = useItemsStore()
 const ratingsStore = useRatingsStore()
 
-const sortBy = ref('title') // 'title' | 'rating'
+const sortBy = ref('title') // 'title' | 'rating' | 'date_added'
 const filterBy = ref('all') // 'all' | 'rated' | 'unrated'
 
 onMounted(() => {
@@ -48,15 +48,25 @@ const filteredFlatItemsByRating = computed(() => {
   })
 })
 
+const filteredFlatItemsByDateAdded = computed(() => {
+  const flat = itemsStore.groups.flatMap((group) => group.items).filter((item) => matchesFilter(item.id))
+  return flat.sort((a, b) => new Date(b.added_at) - new Date(a.added_at))
+})
+
+const FLAT_LISTS_BY_SORT = {
+  rating: filteredFlatItemsByRating,
+  date_added: filteredFlatItemsByDateAdded,
+}
+
 const isEmpty = computed(() =>
-  sortBy.value === 'title' ? filteredGroups.value.length === 0 : filteredFlatItemsByRating.value.length === 0,
+  sortBy.value === 'title' ? filteredGroups.value.length === 0 : activeList.value.length === 0,
 )
 
 // One pagination instance covering whichever list is currently on screen - paginating groups
-// (10 shows per page) when sorted by title, or individual items (10 per page) when sorted by
-// rating, since switching modes naturally resets back to page 1.
+// (10 shows per page) when sorted by title, or individual items (10 per page) for the other
+// sort modes, since switching modes naturally resets back to page 1.
 const activeList = computed(() =>
-  sortBy.value === 'title' ? filteredGroups.value : filteredFlatItemsByRating.value,
+  sortBy.value === 'title' ? filteredGroups.value : FLAT_LISTS_BY_SORT[sortBy.value].value,
 )
 const { page, totalPages, pagedItems } = usePagination(() => activeList.value, 10)
 </script>
@@ -72,6 +82,7 @@ const { page, totalPages, pagedItems } = usePagination(() => activeList.value, 1
         <select v-model="sortBy">
           <option value="title">Title</option>
           <option value="rating">Rating</option>
+          <option value="date_added">Date added</option>
         </select>
       </label>
       <label>
@@ -87,7 +98,7 @@ const { page, totalPages, pagedItems } = usePagination(() => activeList.value, 1
     <p v-if="itemsStore.loading">Loading...</p>
     <p v-else-if="itemsStore.error" class="library-view__error">{{ itemsStore.error }}</p>
     <p v-else-if="itemsStore.groups.length === 0">
-      Nothing here yet — add a movie or show above and rate it 1-5.
+      Nothing here yet — add a movie or show above and rate it 0.5-5.
     </p>
     <p v-else-if="isEmpty">Nothing matches this filter.</p>
 

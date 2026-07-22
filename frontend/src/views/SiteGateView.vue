@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useSiteAccessStore } from '../stores/siteAccess'
+import PasswordField from '../components/common/PasswordField.vue'
 
 const passphrase = ref('')
 const submitting = ref(false)
@@ -28,7 +29,7 @@ async function handleSubmit() {
     <form class="site-gate-view__form" @submit.prevent="handleSubmit">
       <label>
         Passphrase
-        <input v-model="passphrase" type="password" autocomplete="off" required autofocus />
+        <PasswordField v-model="passphrase" autocomplete="off" required autofocus />
       </label>
 
       <p v-if="siteAccess.error" class="site-gate-view__error">{{ siteAccess.error }}</p>

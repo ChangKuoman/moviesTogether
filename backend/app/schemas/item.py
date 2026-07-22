@@ -44,6 +44,7 @@ class ItemOut(BaseModel):
     runtime: int | None
     source: str
     created_at: datetime
+    added_at: datetime | None  # when the current user added it to their library
 
     model_config = {"from_attributes": True}
 

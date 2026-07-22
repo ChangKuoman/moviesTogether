@@ -9,7 +9,7 @@ from app.models.friendship import Friendship
 from app.models.user import User
 from app.schemas.auth import UserOut
 from app.schemas.friendship import FriendRequestCreate, FriendRequestOut
-from app.services import friendship_service
+from app.services import friendship_service, notification_service
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -48,6 +48,9 @@ def send_friend_request(
 
     request = Friendship(requester_id=current_user.id, recipient_id=recipient.id, status="pending")
     db.add(request)
+    notification_service.create_notification(
+        db, user_id=recipient.id, actor_id=current_user.id, type="friend_request_received"
+    )
     db.commit()
     db.refresh(request)
     return _request_to_out(request, current_user, recipient)
@@ -85,6 +88,9 @@ def accept_request(
 
     request.status = "accepted"
     request.responded_at = datetime.now(timezone.utc)
+    notification_service.create_notification(
+        db, user_id=request.requester_id, actor_id=current_user.id, type="friend_request_accepted"
+    )
     db.commit()
     db.refresh(request)
     return _request_to_out(request, db.get(User, request.requester_id), current_user)

@@ -51,6 +51,21 @@ export const useItemsStore = defineStore('items', {
       await this.fetchGrouped()
       return item
     },
+    // Adds several seasons of the same show in one go (e.g. "select all seasons") - fires the
+    // requests together and refetches the library once at the end, rather than once per season.
+    // A season already in the library is not treated as a failure - it's a no-op either way.
+    async addSeasonsFromTmdb(tmdbId, seasonNumbers) {
+      const results = await Promise.allSettled(
+        seasonNumbers.map((seasonNumber) =>
+          tmdbApi.createItemFromTmdb({ tmdb_id: tmdbId, media_type: 'tv', season_number: seasonNumber }),
+        ),
+      )
+      await this.fetchGrouped()
+      const failures = results.filter(
+        (r) => r.status === 'rejected' && !r.reason?.response?.data?.detail?.includes('already in your library'),
+      )
+      return { failedCount: failures.length, total: results.length }
+    },
     async removeItem(itemId) {
       await itemsApi.deleteItem(itemId)
       await this.fetchGrouped()

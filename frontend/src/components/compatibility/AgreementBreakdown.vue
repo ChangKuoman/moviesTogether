@@ -10,7 +10,7 @@ defineProps({
       <h3>Where you agree</h3>
       <ul>
         <li v-for="a in compatibility.top_agreements" :key="a.item_id">
-          {{ a.show_title }} — {{ a.user_a_rating }}★ vs {{ a.user_b_rating }}★
+          {{ a.show_title }} — You: {{ a.user_a_rating }}★ vs {{ compatibility.user_b.name }}: {{ a.user_b_rating }}★
         </li>
       </ul>
       <p v-if="!compatibility.top_agreements.length">No overlapping ratings yet.</p>
@@ -20,7 +20,7 @@ defineProps({
       <h3>Where you disagree</h3>
       <ul>
         <li v-for="d in compatibility.top_disagreements" :key="d.item_id">
-          {{ d.show_title }} — {{ d.user_a_rating }}★ vs {{ d.user_b_rating }}★
+          {{ d.show_title }} — You: {{ d.user_a_rating }}★ vs {{ compatibility.user_b.name }}: {{ d.user_b_rating }}★
         </li>
       </ul>
       <p v-if="!compatibility.top_disagreements.length">No overlapping ratings yet.</p>
@@ -30,7 +30,7 @@ defineProps({
       <h3>By genre</h3>
       <ul>
         <li v-for="g in compatibility.genre_breakdown" :key="g.genre">
-          {{ g.genre }} — {{ g.user_a_avg }}★ vs {{ g.user_b_avg }}★
+          {{ g.genre }} — You: {{ g.user_a_avg }}★ vs {{ compatibility.user_b.name }}: {{ g.user_b_avg }}★
         </li>
       </ul>
     </div>

@@ -96,7 +96,51 @@ curl http://<vm-static-ip>:8001/api/health  # should time out / connection refus
 - Enter the correct passphrase → the normal login/sign-up screen appears.
 - Sign up your friend, log in, rate a few things, confirm Recommender/Movie Map/Analysis all work exactly like they did locally.
 
-## 6. Ongoing maintenance (all free)
+## 6. Redeploying after changes
+
+The frontend and backend redeploy differently since only one of them has CI/CD.
+
+**Frontend changes** — nothing to do manually. Vercel is already watching the connected GitHub
+branch; any `git push` that touches `frontend/` triggers an automatic rebuild and redeploy.
+
+**Backend changes** — push to GitHub, then SSH into the VM and pull:
+
+```bash
+ssh you@<vm-ip>
+cd /opt/moviestogether   # or wherever you cloned it
+git pull
+```
+
+What to run next depends on what changed:
+
+- **Only Python code in `app/`** (routes, services, models, etc.) — just restart the service, no
+  need to touch dependencies or config:
+  ```bash
+  sudo systemctl restart moviestogether-backend
+  ```
+- **`backend/requirements.txt` changed**, or you edited `deploy/Caddyfile` or
+  `deploy/moviestogether-backend.service.template` — re-run the full setup script. It's idempotent
+  (safe to run anytime) and picks up the new dependencies/config without touching your existing
+  `backend/.env`:
+  ```bash
+  sudo bash deploy/setup-backend.sh
+  ```
+  Both paths end the same way — confirm the restart worked:
+  ```bash
+  curl -sf http://127.0.0.1/api/health && echo " -> backend OK"
+  ```
+
+**Changed both frontend and backend in the same push** — one `git push` updates the source for
+both. Vercel picks up its half automatically; you still do the SSH + pull + restart step above for
+the backend half — there's no way around the manual VM step with this setup.
+
+**Database migrations** — there isn't a migration tool configured (SQLAlchemy creates tables on
+first run via `Base.metadata.create_all`, no Alembic). If you add/change a model's columns, the
+existing `moviestogether.db` on the VM won't pick up the change automatically; back up the file
+first (see §7 below) and either drop/recreate it (losing data) or hand-write the `ALTER TABLE`
+yourself before restarting the service.
+
+## 7. Ongoing maintenance (all free)
 
 ```bash
 sudo apt install -y unattended-upgrades   # automatic OS security patches

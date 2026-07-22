@@ -6,6 +6,7 @@ import { useModelStore } from '../stores/model'
 import CompatibilityGauge from '../components/compatibility/CompatibilityGauge.vue'
 import AgreementBreakdown from '../components/compatibility/AgreementBreakdown.vue'
 import WatchTogetherTable from '../components/compatibility/WatchTogetherTable.vue'
+import BothWatchedTable from '../components/compatibility/BothWatchedTable.vue'
 import Pagination from '../components/common/Pagination.vue'
 import { usePagination } from '../composables/usePagination'
 
@@ -16,11 +17,13 @@ const modelStore = useModelStore()
 const friendId = ref(null)
 const wCollab = ref(0.6)
 
+const HYBRID_PER_PAGE = 10
 const {
   page: hybridPage,
   totalPages: hybridTotalPages,
   pagedItems: hybridPagedItems,
-} = usePagination(() => modelStore.hybrid?.items ?? [], 10)
+} = usePagination(() => modelStore.hybrid?.items ?? [], HYBRID_PER_PAGE)
+const hybridFillerRowCount = computed(() => HYBRID_PER_PAGE - hybridPagedItems.value.length)
 
 const friendName = computed(
   () => friendsStore.friends.find((f) => f.id === friendId.value)?.name ?? 'friend',
@@ -95,6 +98,9 @@ watch(wCollab, refreshHybrid)
             :overlap-count="modelStore.compatibility.overlap_count"
           />
           <AgreementBreakdown :compatibility="modelStore.compatibility" />
+
+          <h3 class="analysis-view__subheading">Both watched</h3>
+          <BothWatchedTable :items="modelStore.compatibility.both_watched" :friend-name="friendName" />
         </template>
       </template>
     </section>
@@ -112,18 +118,21 @@ watch(wCollab, refreshHybrid)
         <h3 class="analysis-view__subheading">Neither of you has watched</h3>
         <WatchTogetherTable
           :items="neitherWatched"
+          :friend-name="friendName"
           empty-message="Nothing unwatched by both of you right now."
         />
 
         <h3 class="analysis-view__subheading">You've watched, {{ friendName }} hasn't</h3>
         <WatchTogetherTable
           :items="youWatched"
+          :friend-name="friendName"
           :empty-message="`Nothing you've rated that ${friendName} hasn't yet.`"
         />
 
         <h3 class="analysis-view__subheading">{{ friendName }} has watched, you haven't</h3>
         <WatchTogetherTable
           :items="friendWatched"
+          :friend-name="friendName"
           :empty-message="`Nothing ${friendName} has rated that you haven't yet.`"
         />
       </template>
@@ -155,9 +164,12 @@ watch(wCollab, refreshHybrid)
             <td>{{ item.content_score.toFixed(2) }}</td>
             <td>{{ item.hybrid_score.toFixed(2) }}</td>
           </tr>
+          <tr v-for="n in hybridFillerRowCount" :key="`filler-${n}`" class="analysis-view__filler-row">
+            <td colspan="4">&nbsp;</td>
+          </tr>
         </tbody>
       </table>
-      <Pagination v-if="modelStore.hybrid" v-model="hybridPage" :total-pages="hybridTotalPages" />
+      <Pagination v-if="modelStore.hybrid" v-model="hybridPage" :total-pages="hybridTotalPages" always-show />
     </section>
   </div>
 </template>
@@ -205,5 +217,8 @@ watch(wCollab, refreshHybrid)
   font-size: 1rem;
   opacity: 0.85;
   margin: 1.25rem 0 0.5rem;
+}
+.analysis-view__filler-row td {
+  border-bottom-color: transparent;
 }
 </style>

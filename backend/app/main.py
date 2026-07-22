@@ -13,12 +13,14 @@ from app.routers import (
     friends,
     items,
     movie_map,
+    notifications,
     ratings,
     recommendations,
     site_access,
     tmdb,
 )
 from app.security import verify_site_token
+from app.services.migrations import run_startup_migrations
 
 app = FastAPI(title="MoviesTogether API")
 
@@ -57,6 +59,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
+    run_startup_migrations(engine)
     Base.metadata.create_all(bind=engine)
 
 
@@ -70,6 +73,7 @@ app.include_router(movie_map.router)
 app.include_router(compatibility.router)
 app.include_router(analysis.router)
 app.include_router(friends.router)
+app.include_router(notifications.router)
 app.include_router(site_access.router)
 
 

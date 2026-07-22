@@ -52,6 +52,7 @@ def compute_compatibility(db: Session, factors: dict, user_a_id: int, user_b_id:
 
     agreements = sorted(scored, key=lambda x: (x["diff"], -(x["user_a_rating"] + x["user_b_rating"])))
     disagreements = sorted(scored, key=lambda x: -x["diff"])
+    both_watched = sorted(scored, key=lambda x: x["title"].lower())
 
     genre_breakdown = _genre_breakdown(overlap)
 
@@ -60,6 +61,7 @@ def compute_compatibility(db: Session, factors: dict, user_a_id: int, user_b_id:
         "overlap_count": len(overlap),
         "top_agreements": agreements[:TOP_N_AGREEMENTS],
         "top_disagreements": disagreements[:TOP_N_AGREEMENTS],
+        "both_watched": both_watched,
         "genre_breakdown": genre_breakdown,
     }
 

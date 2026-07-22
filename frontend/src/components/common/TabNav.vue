@@ -1,6 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import NotificationBell from './NotificationBell.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -34,6 +35,7 @@ function handleLogout() {
       </RouterLink>
     </div>
     <div class="tab-nav__user">
+      <NotificationBell />
       <span>{{ auth.currentUser?.name }}</span>
       <button type="button" @click="handleLogout">Log out</button>
     </div>

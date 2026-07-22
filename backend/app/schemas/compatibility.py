@@ -7,9 +7,9 @@ class AgreementItemOut(BaseModel):
     item_id: int
     title: str
     show_title: str
-    user_a_rating: int
-    user_b_rating: int
-    diff: int
+    user_a_rating: float
+    user_b_rating: float
+    diff: float
 
 
 class GenreBreakdownOut(BaseModel):
@@ -25,6 +25,7 @@ class CompatibilityOut(BaseModel):
     overlap_count: int
     top_agreements: list[AgreementItemOut]
     top_disagreements: list[AgreementItemOut]
+    both_watched: list[AgreementItemOut]
     genre_breakdown: list[GenreBreakdownOut]
 
 

@@ -5,28 +5,25 @@ import Pagination from '../common/Pagination.vue'
 
 const props = defineProps({
   items: { type: Array, required: true },
-  emptyMessage: { type: String, default: 'Nothing here right now.' },
-  friendName: { type: String, default: 'Friend' },
+  friendName: { type: String, default: 'friend' },
 })
 
 const COLUMNS = computed(() => [
   { key: 'title', label: 'Item' },
   { key: 'you', label: 'You' },
   { key: 'friend', label: props.friendName },
-  { key: 'average', label: 'Average' },
-  { key: 'watch_together_score', label: 'Watch-together score' },
+  { key: 'diff', label: 'Difference' },
 ])
 
 const SORT_VALUE = {
   title: (item) => item.show_title.toLowerCase(),
-  you: (item) => item.predicted_a,
-  friend: (item) => item.predicted_b,
-  average: (item) => (item.predicted_a + item.predicted_b) / 2,
-  watch_together_score: (item) => item.watch_together_score,
+  you: (item) => item.user_a_rating,
+  friend: (item) => item.user_b_rating,
+  diff: (item) => item.diff,
 }
 
-const sortKey = ref('watch_together_score')
-const sortDir = ref('desc')
+const sortKey = ref('title')
+const sortDir = ref('asc')
 
 const sortedItems = computed(() => {
   const getValue = SORT_VALUE[sortKey.value]
@@ -45,7 +42,7 @@ function setSort(key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortKey.value = key
-    sortDir.value = 'desc'
+    sortDir.value = 'asc'
   }
 }
 
@@ -58,15 +55,17 @@ const fillerRowCount = computed(() => PER_PAGE - pagedItems.value.length)
 </script>
 
 <template>
-  <p v-if="items.length === 0" class="watch-together-table__empty">{{ emptyMessage }}</p>
+  <p v-if="items.length === 0" class="both-watched-table__empty">
+    Nothing you've both rated yet.
+  </p>
   <template v-else>
-    <table class="watch-together-table">
+    <table class="both-watched-table">
       <thead>
         <tr>
           <th
             v-for="col in COLUMNS"
             :key="col.key"
-            class="watch-together-table__sortable-th"
+            class="both-watched-table__sortable-th"
             @click="setSort(col.key)"
           >
             {{ col.label }}
@@ -76,13 +75,12 @@ const fillerRowCount = computed(() => PER_PAGE - pagedItems.value.length)
       </thead>
       <tbody>
         <tr v-for="item in pagedItems" :key="item.item_id">
-          <td>{{ item.show_title }}<span v-if="item.season_number"> S{{ item.season_number }}</span></td>
-          <td>{{ item.predicted_a.toFixed(2) }}</td>
-          <td>{{ item.predicted_b.toFixed(2) }}</td>
-          <td>{{ ((item.predicted_a + item.predicted_b) / 2).toFixed(2) }}</td>
-          <td>{{ item.watch_together_score.toFixed(2) }}</td>
+          <td>{{ item.show_title }}</td>
+          <td>{{ item.user_a_rating }}</td>
+          <td>{{ item.user_b_rating }}</td>
+          <td>{{ item.diff }}</td>
         </tr>
-        <tr v-for="n in fillerRowCount" :key="`filler-${n}`" class="watch-together-table__filler-row">
+        <tr v-for="n in fillerRowCount" :key="`filler-${n}`" class="both-watched-table__filler-row">
           <td :colspan="COLUMNS.length">&nbsp;</td>
         </tr>
       </tbody>
@@ -92,29 +90,29 @@ const fillerRowCount = computed(() => PER_PAGE - pagedItems.value.length)
 </template>
 
 <style scoped>
-.watch-together-table {
+.both-watched-table {
   width: 100%;
   border-collapse: collapse;
 }
-.watch-together-table th,
-.watch-together-table td {
+.both-watched-table th,
+.both-watched-table td {
   text-align: left;
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid #333;
 }
-.watch-together-table__sortable-th {
+.both-watched-table__sortable-th {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
-.watch-together-table__sortable-th:hover {
+.both-watched-table__sortable-th:hover {
   color: #fff;
 }
-.watch-together-table__empty {
+.both-watched-table__empty {
   opacity: 0.75;
   font-size: 0.9rem;
 }
-.watch-together-table__filler-row td {
+.both-watched-table__filler-row td {
   border-bottom-color: transparent;
 }
 </style>

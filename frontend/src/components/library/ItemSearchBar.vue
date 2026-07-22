@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useItemsStore } from '../../stores/items'
 import * as tmdbApi from '../../api/tmdb'
 import ManualItemForm from './ManualItemForm.vue'
@@ -10,12 +10,19 @@ const query = ref('')
 const mediaType = ref('movie')
 const seasons = ref(null) // populated once a TV show is picked
 const pickedShow = ref(null)
+const selectedSeasons = ref([]) // season_numbers currently checked
+const adding = ref(false)
 const error = ref(null)
 let debounceTimer = null
+
+const allSeasonsSelected = computed(
+  () => seasons.value?.length > 0 && selectedSeasons.value.length === seasons.value.length,
+)
 
 watch([query, mediaType], () => {
   seasons.value = null
   pickedShow.value = null
+  selectedSeasons.value = []
   clearTimeout(debounceTimer)
   if (!query.value.trim()) {
     itemsStore.tmdbSearchResults = []
@@ -37,21 +44,32 @@ async function pickResult(result) {
     }
   } else {
     pickedShow.value = result
+    selectedSeasons.value = []
     seasons.value = await tmdbApi.getTvSeasons(result.tmdb_id)
   }
 }
 
-async function pickSeason(season) {
+function toggleSelectAllSeasons() {
+  selectedSeasons.value = allSeasonsSelected.value
+    ? []
+    : seasons.value.map((s) => s.season_number)
+}
+
+async function addSelectedSeasons() {
   error.value = null
+  adding.value = true
   try {
-    await itemsStore.addFromTmdb({
-      tmdb_id: pickedShow.value.tmdb_id,
-      media_type: 'tv',
-      season_number: season.season_number,
-    })
-    resetSearch()
-  } catch (e) {
-    error.value = e.response?.data?.detail || 'Could not add this season'
+    const { failedCount, total } = await itemsStore.addSeasonsFromTmdb(
+      pickedShow.value.tmdb_id,
+      selectedSeasons.value,
+    )
+    if (failedCount === total) {
+      error.value = 'Could not add the selected season(s)'
+    } else {
+      resetSearch()
+    }
+  } finally {
+    adding.value = false
   }
 }
 
@@ -59,6 +77,7 @@ function resetSearch() {
   query.value = ''
   seasons.value = null
   pickedShow.value = null
+  selectedSeasons.value = []
   itemsStore.tmdbSearchResults = []
 }
 </script>
@@ -82,12 +101,26 @@ function resetSearch() {
     </ul>
 
     <div v-if="pickedShow && seasons" class="item-search-bar__seasons">
-      <p>Pick a season of "{{ pickedShow.title }}":</p>
+      <p>Pick season(s) of "{{ pickedShow.title }}":</p>
+      <label class="item-search-bar__season-option item-search-bar__select-all">
+        <input type="checkbox" :checked="allSeasonsSelected" @change="toggleSelectAllSeasons" />
+        All seasons
+      </label>
       <ul>
-        <li v-for="season in seasons" :key="season.season_number" @click="pickSeason(season)">
-          Season {{ season.season_number }} — {{ season.name }}
+        <li v-for="season in seasons" :key="season.season_number">
+          <label class="item-search-bar__season-option">
+            <input type="checkbox" v-model="selectedSeasons" :value="season.season_number" />
+            Season {{ season.season_number }} — {{ season.name }}
+          </label>
         </li>
       </ul>
+      <button
+        type="button"
+        :disabled="selectedSeasons.length === 0 || adding"
+        @click="addSelectedSeasons"
+      >
+        {{ adding ? 'Adding...' : `Add ${selectedSeasons.length} season${selectedSeasons.length === 1 ? '' : 's'}` }}
+      </button>
     </div>
   </div>
 
@@ -109,14 +142,29 @@ function resetSearch() {
   border-radius: 8px;
   overflow: hidden;
 }
-.item-search-bar__results li,
-.item-search-bar__seasons li {
+.item-search-bar__results li {
   padding: 0.5rem 0.75rem;
   cursor: pointer;
 }
-.item-search-bar__results li:hover,
+.item-search-bar__results li:hover {
+  background: #222;
+}
+.item-search-bar__seasons li {
+  padding: 0.35rem 0.75rem;
+}
 .item-search-bar__seasons li:hover {
   background: #222;
+}
+.item-search-bar__season-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.item-search-bar__select-all {
+  padding: 0.35rem 0.75rem;
+  font-weight: 600;
+  border-bottom: 1px solid #333;
 }
 .item-search-bar__error {
   color: #e5484d;

@@ -24,21 +24,23 @@ def _retrain_if_possible(db: Session) -> None:
 
 
 def _my_items_query(db: Session, user_id: int):
-    return db.query(Item).join(LibraryEntry, LibraryEntry.item_id == Item.id).filter(
-        LibraryEntry.user_id == user_id
+    return (
+        db.query(Item, LibraryEntry.added_at)
+        .join(LibraryEntry, LibraryEntry.item_id == Item.id)
+        .filter(LibraryEntry.user_id == user_id)
     )
 
 
 @router.get("", response_model=list[ItemOut])
 def list_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    items = _my_items_query(db, current_user.id).order_by(Item.show_title, Item.season_number).all()
-    return [item_to_out(i) for i in items]
+    rows = _my_items_query(db, current_user.id).order_by(Item.show_title, Item.season_number).all()
+    return [item_to_out(item, added_at) for item, added_at in rows]
 
 
 @router.get("/grouped", response_model=list[ShowGroupOut])
 def list_items_grouped(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    items = _my_items_query(db, current_user.id).all()
-    return group_by_show(items)
+    rows = _my_items_query(db, current_user.id).all()
+    return group_by_show(rows)
 
 
 @router.get("/{item_id}", response_model=ItemOut)
@@ -80,10 +82,10 @@ def create_item(
         db.add(item)
         db.flush()
 
-    library_service.add_to_library(db, current_user.id, item.id)
+    entry = library_service.add_to_library(db, current_user.id, item.id)
     db.commit()
     db.refresh(item)
-    return item_to_out(item)
+    return item_to_out(item, entry.added_at)
 
 
 @router.post("/from-tmdb", response_model=ItemOut, status_code=201)
@@ -135,10 +137,10 @@ def create_item_from_tmdb(
         db.add(item)
         db.flush()
 
-    library_service.add_to_library(db, current_user.id, item.id)
+    entry = library_service.add_to_library(db, current_user.id, item.id)
     db.commit()
     db.refresh(item)
-    return item_to_out(item)
+    return item_to_out(item, entry.added_at)
 
 
 @router.patch("/{item_id}", response_model=ItemOut)

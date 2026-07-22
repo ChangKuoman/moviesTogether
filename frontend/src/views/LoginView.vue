@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import PasswordField from '../components/common/PasswordField.vue'
 
 const mode = ref('login') // 'login' | 'register'
 const name = ref('')
@@ -49,7 +50,7 @@ function toggleMode() {
       </label>
       <label>
         Password
-        <input v-model="password" type="password" autocomplete="current-password" required minlength="4" />
+        <PasswordField v-model="password" autocomplete="current-password" required minlength="4" />
       </label>
 
       <p v-if="auth.error" class="login-view__error">{{ auth.error }}</p>

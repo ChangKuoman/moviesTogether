@@ -3,7 +3,7 @@ import * as ratingsApi from '../api/ratings'
 
 export const useRatingsStore = defineStore('ratings', {
   state: () => ({
-    byItemId: {}, // { [item_id]: rating (1-5) }
+    byItemId: {}, // { [item_id]: rating (0.5-5, half-star increments) }
     loading: false,
     error: null,
   }),
